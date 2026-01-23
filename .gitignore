@@ -1,0 +1,39 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# MLflow
+mlruns/
+tracking/
+mlflow.db
+
+# Models
+models/*.pkl
+models/*.joblib
+
+# DVC
+/data/*.csv
+.dvc/cache
+.dvc/tmp
+
+# Testing
+.pytest_cache/
+.coverage
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
