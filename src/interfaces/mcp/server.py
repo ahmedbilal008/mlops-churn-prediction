@@ -158,39 +158,81 @@ def _prepare_features(customer_data: dict) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
+# Dataset-derived defaults (mode for categoricals, median for numericals)
+# Used when users provide only a few key features.
+# ---------------------------------------------------------------------------
+
+_DATASET_DEFAULTS: dict[str, str | int | float] = {
+    "gender": "Male",
+    "SeniorCitizen": 0,
+    "Partner": "No",
+    "Dependents": "No",
+    "tenure": 29,
+    "PhoneService": "Yes",
+    "MultipleLines": "No",
+    "InternetService": "Fiber optic",
+    "OnlineSecurity": "No",
+    "OnlineBackup": "No",
+    "DeviceProtection": "No",
+    "TechSupport": "No",
+    "StreamingTV": "No",
+    "StreamingMovies": "No",
+    "Contract": "Month-to-month",
+    "PaperlessBilling": "Yes",
+    "PaymentMethod": "Electronic check",
+    "MonthlyCharges": 70.35,
+    "TotalCharges": 1397.47,
+}
+
+
+def _apply_defaults(kwargs: dict) -> dict:
+    """Merge user-supplied features with dataset defaults."""
+    merged = dict(_DATASET_DEFAULTS)
+    # Override only the keys the user actually provided
+    for k, v in kwargs.items():
+        if v is not None:
+            merged[k] = v
+    return merged
+
+
+# ---------------------------------------------------------------------------
 # Tool 1: Predict Churn
 # ---------------------------------------------------------------------------
 
 
 @mcp.tool()
 def predict_churn(
-    gender: str,
-    SeniorCitizen: int,
-    Partner: str,
-    Dependents: str,
-    tenure: int,
-    PhoneService: str,
-    MultipleLines: str,
-    InternetService: str,
-    OnlineSecurity: str,
-    OnlineBackup: str,
-    DeviceProtection: str,
-    TechSupport: str,
-    StreamingTV: str,
-    StreamingMovies: str,
-    Contract: str,
-    PaperlessBilling: str,
-    PaymentMethod: str,
-    MonthlyCharges: float,
-    TotalCharges: float,
+    tenure: int | None = None,
+    MonthlyCharges: float | None = None,
+    Contract: str | None = None,
+    InternetService: str | None = None,
+    TotalCharges: float | None = None,
+    gender: str | None = None,
+    SeniorCitizen: int | None = None,
+    Partner: str | None = None,
+    Dependents: str | None = None,
+    PhoneService: str | None = None,
+    MultipleLines: str | None = None,
+    OnlineSecurity: str | None = None,
+    OnlineBackup: str | None = None,
+    DeviceProtection: str | None = None,
+    TechSupport: str | None = None,
+    StreamingTV: str | None = None,
+    StreamingMovies: str | None = None,
+    PaperlessBilling: str | None = None,
+    PaymentMethod: str | None = None,
 ) -> str:
     """Predict customer churn probability and risk level.
+
+    All parameters are optional. Unspecified features use dataset defaults
+    (most common value for categoricals, median for numericals).
+    Key features: tenure, MonthlyCharges, Contract, InternetService.
 
     Returns churn probability, risk category (LOW/MEDIUM/HIGH),
     the top features driving the prediction, and the model used.
     """
     try:
-        customer_data = {
+        customer_data = _apply_defaults({
             "gender": gender,
             "SeniorCitizen": SeniorCitizen,
             "Partner": Partner,
@@ -210,7 +252,7 @@ def predict_churn(
             "PaymentMethod": PaymentMethod,
             "MonthlyCharges": MonthlyCharges,
             "TotalCharges": TotalCharges,
-        }
+        })
 
         # Validate input
         CustomerFeatures(**customer_data)
@@ -261,34 +303,35 @@ def predict_churn(
 
 @mcp.tool()
 def explain_prediction(
-    gender: str,
-    SeniorCitizen: int,
-    Partner: str,
-    Dependents: str,
-    tenure: int,
-    PhoneService: str,
-    MultipleLines: str,
-    InternetService: str,
-    OnlineSecurity: str,
-    OnlineBackup: str,
-    DeviceProtection: str,
-    TechSupport: str,
-    StreamingTV: str,
-    StreamingMovies: str,
-    Contract: str,
-    PaperlessBilling: str,
-    PaymentMethod: str,
-    MonthlyCharges: float,
-    TotalCharges: float,
+    tenure: int | None = None,
+    MonthlyCharges: float | None = None,
+    Contract: str | None = None,
+    InternetService: str | None = None,
+    TotalCharges: float | None = None,
+    gender: str | None = None,
+    SeniorCitizen: int | None = None,
+    Partner: str | None = None,
+    Dependents: str | None = None,
+    PhoneService: str | None = None,
+    MultipleLines: str | None = None,
+    OnlineSecurity: str | None = None,
+    OnlineBackup: str | None = None,
+    DeviceProtection: str | None = None,
+    TechSupport: str | None = None,
+    StreamingTV: str | None = None,
+    StreamingMovies: str | None = None,
+    PaperlessBilling: str | None = None,
+    PaymentMethod: str | None = None,
 ) -> str:
     """Get detailed SHAP explanation for a churn prediction.
 
+    All parameters are optional. Unspecified features use dataset defaults.
     Returns each feature's SHAP contribution to the prediction,
     the base prediction value, and the top positive/negative drivers.
     Uses SHAP (SHapley Additive exPlanations) from game theory.
     """
     try:
-        customer_data = {
+        customer_data = _apply_defaults({
             "gender": gender,
             "SeniorCitizen": SeniorCitizen,
             "Partner": Partner,
@@ -308,7 +351,7 @@ def explain_prediction(
             "PaymentMethod": PaymentMethod,
             "MonthlyCharges": MonthlyCharges,
             "TotalCharges": TotalCharges,
-        }
+        })
 
         X = _prepare_features(customer_data)
         explainer = _ModelCache.get_explainer()

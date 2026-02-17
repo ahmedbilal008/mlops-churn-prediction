@@ -96,3 +96,31 @@ class TestPredictChurn:
         assert "risk_level" in result
         assert result["risk_level"] in ("LOW", "MEDIUM", "HIGH")
         assert 0 <= result["churn_probability"] <= 1
+
+    def test_prediction_with_defaults_only(self):
+        """Test that predict_churn works with no arguments (all defaults)."""
+        if not _models_trained():
+            pytest.skip("Models not trained yet.")
+
+        from src.interfaces.mcp.server import predict_churn
+
+        result = json.loads(predict_churn.fn())
+
+        assert "churn_probability" in result
+        assert "risk_level" in result
+        assert 0 <= result["churn_probability"] <= 1
+
+    def test_prediction_with_partial_features(self):
+        """Test that predict_churn works with only a few key features."""
+        if not _models_trained():
+            pytest.skip("Models not trained yet.")
+
+        from src.interfaces.mcp.server import predict_churn
+
+        result = json.loads(
+            predict_churn.fn(tenure=2, MonthlyCharges=80.0, Contract="Month-to-month")
+        )
+
+        assert "churn_probability" in result
+        assert "risk_level" in result
+        assert 0 <= result["churn_probability"] <= 1

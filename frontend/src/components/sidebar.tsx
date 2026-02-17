@@ -12,6 +12,10 @@ import {
   Trophy,
   Cpu,
   Clock,
+  Wrench,
+  ChevronDown,
+  ChevronRight,
+  Info,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -211,7 +215,7 @@ function LeaderboardPanel() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    callTool<CompareModelsResult>("compare_models", { metric: "f1_score" })
+    callTool<CompareModelsResult>("compare_models")
       .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoading(false));
@@ -378,6 +382,196 @@ function RetrainButton() {
   );
 }
 
+// --- MCP Tools Reference Data ---
+interface ToolParam {
+  name: string;
+  type: string;
+  desc: string;
+  default?: string;
+  key?: boolean;
+}
+
+interface ToolDef {
+  name: string;
+  description: string;
+  params: ToolParam[];
+}
+
+const MCP_TOOLS: ToolDef[] = [
+  {
+    name: "predict_churn",
+    description: "Predict customer churn probability with SHAP-based explanations of top contributing factors.",
+    params: [
+      { name: "tenure", type: "int", desc: "Months as customer (0-72)", default: "29", key: true },
+      { name: "MonthlyCharges", type: "float", desc: "Monthly charge amount", default: "70.35", key: true },
+      { name: "Contract", type: "string", desc: "Month-to-month / One year / Two year", default: "Month-to-month", key: true },
+      { name: "InternetService", type: "string", desc: "DSL / Fiber optic / No", default: "Fiber optic", key: true },
+      { name: "TotalCharges", type: "float", desc: "Total charges to date", default: "1397.47" },
+      { name: "gender", type: "string", desc: "Male / Female", default: "Male" },
+      { name: "SeniorCitizen", type: "int", desc: "0 or 1", default: "0" },
+      { name: "Partner", type: "string", desc: "Yes / No", default: "No" },
+      { name: "Dependents", type: "string", desc: "Yes / No", default: "No" },
+      { name: "PhoneService", type: "string", desc: "Yes / No", default: "Yes" },
+      { name: "MultipleLines", type: "string", desc: "Yes / No / No phone service", default: "No" },
+      { name: "OnlineSecurity", type: "string", desc: "Yes / No / No internet service", default: "No" },
+      { name: "OnlineBackup", type: "string", desc: "Yes / No / No internet service", default: "No" },
+      { name: "DeviceProtection", type: "string", desc: "Yes / No / No internet service", default: "No" },
+      { name: "TechSupport", type: "string", desc: "Yes / No / No internet service", default: "No" },
+      { name: "StreamingTV", type: "string", desc: "Yes / No / No internet service", default: "No" },
+      { name: "StreamingMovies", type: "string", desc: "Yes / No / No internet service", default: "No" },
+      { name: "PaperlessBilling", type: "string", desc: "Yes / No", default: "Yes" },
+      { name: "PaymentMethod", type: "string", desc: "Electronic check / Mailed check / Bank transfer / Credit card", default: "Electronic check" },
+    ],
+  },
+  {
+    name: "explain_prediction",
+    description: "Get detailed SHAP explanation for a prediction. Same params as predict_churn — all optional with dataset defaults.",
+    params: [],
+  },
+  {
+    name: "get_model_metrics",
+    description: "Get performance metrics (accuracy, precision, recall, F1, ROC-AUC) for a specific model.",
+    params: [
+      { name: "model_name", type: "string", desc: "logistic_regression / random_forest / xgboost", key: true },
+    ],
+  },
+  {
+    name: "compare_models",
+    description: "Compare all trained models side-by-side, ranked by F1 score.",
+    params: [],
+  },
+  {
+    name: "get_dataset_summary",
+    description: "Get dataset overview: row count, feature types, churn rate, and statistics.",
+    params: [],
+  },
+  {
+    name: "get_feature_importance",
+    description: "Get global SHAP feature importance rankings across all customers.",
+    params: [
+      { name: "top_n", type: "int", desc: "Number of top features to return", default: "10" },
+    ],
+  },
+  {
+    name: "retrain_model",
+    description: "Trigger full retraining pipeline. Trains all 3 models, selects best by F1, logs to MLflow.",
+    params: [],
+  },
+  {
+    name: "add_customer_record",
+    description: "Add a new customer record to the dataset.",
+    params: [
+      { name: "customer data", type: "object", desc: "Full customer features + Churn label", key: true },
+    ],
+  },
+  {
+    name: "get_active_model_info",
+    description: "Get info about the deployed model: name, metrics, training time, dataset size.",
+    params: [],
+  },
+  {
+    name: "system_status",
+    description: "Check platform health: model loaded, SHAP ready, data available, retrain status.",
+    params: [],
+  },
+];
+
+// --- Single Tool Card ---
+function ToolCard({ tool }: { tool: ToolDef }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasParams = tool.params.length > 0;
+
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <button
+        onClick={() => hasParams && setExpanded(!expanded)}
+        className={`w-full text-left px-3 py-2.5 flex items-start gap-2 transition-colors ${
+          hasParams ? "hover:bg-muted/50 cursor-pointer" : "cursor-default"
+        }`}
+      >
+        <Wrench className="h-3.5 w-3.5 mt-0.5 text-muted-foreground shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono font-semibold truncate">
+              {tool.name}
+            </span>
+            {hasParams && (
+              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 shrink-0">
+                {tool.params.length} param{tool.params.length !== 1 ? "s" : ""}
+              </Badge>
+            )}
+            {!hasParams && (
+              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">
+                no params
+              </Badge>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
+            {tool.description}
+          </p>
+        </div>
+        {hasParams && (
+          <span className="shrink-0 mt-0.5">
+            {expanded ? (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+          </span>
+        )}
+      </button>
+
+      {expanded && hasParams && (
+        <div className="border-t bg-muted/20 px-3 py-2 space-y-1.5">
+          <div className="flex items-center gap-1 mb-1">
+            <Info className="h-3 w-3 text-muted-foreground" />
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+              Parameters
+            </span>
+          </div>
+          {tool.params.map((p) => (
+            <div key={p.name} className="flex items-start gap-2 text-[11px]">
+              <code className="bg-background px-1 py-0.5 rounded text-[10px] font-mono shrink-0 border">
+                {p.name}
+              </code>
+              <div className="flex-1 min-w-0">
+                <span className="text-muted-foreground">{p.desc}</span>
+                {p.default && (
+                  <span className="text-muted-foreground/70 ml-1">
+                    (default: {p.default})
+                  </span>
+                )}
+              </div>
+              {"key" in p && p.key && (
+                <Badge variant="default" className="text-[8px] px-1 py-0 h-3.5 shrink-0">
+                  key
+                </Badge>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Tools Panel ---
+function ToolsPanel() {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 mb-3">
+        <Info className="h-3.5 w-3.5 text-muted-foreground" />
+        <p className="text-[11px] text-muted-foreground leading-tight">
+          These MCP tools are available to the AI assistant. Click any tool with parameters to see details.
+        </p>
+      </div>
+      {MCP_TOOLS.map((tool) => (
+        <ToolCard key={tool.name} tool={tool} />
+      ))}
+    </div>
+  );
+}
+
 // --- Combined Sidebar ---
 export default function Sidebar() {
   return (
@@ -389,14 +583,28 @@ export default function Sidebar() {
         </h2>
       </div>
 
-      <Tabs defaultValue="status" className="flex-1 flex flex-col overflow-hidden">
-        <TabsList className="mx-4 mt-3 grid grid-cols-3 h-8">
+      <Tabs defaultValue="tools" className="flex-1 flex flex-col overflow-hidden">
+        <TabsList className="mx-4 mt-3 grid grid-cols-4 h-8">
+          <TabsTrigger value="tools" className="text-xs">Tools</TabsTrigger>
           <TabsTrigger value="status" className="text-xs">Status</TabsTrigger>
           <TabsTrigger value="models" className="text-xs">Models</TabsTrigger>
           <TabsTrigger value="data" className="text-xs">Data</TabsTrigger>
         </TabsList>
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
+          <TabsContent value="tools" className="mt-0 space-y-4">
+            <Card>
+              <CardHeader className="pb-2 pt-3 px-3">
+                <CardTitle className="text-xs font-medium uppercase text-muted-foreground tracking-wider">
+                  MCP Tools Reference
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-3 pb-3">
+                <ToolsPanel />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="status" className="mt-0 space-y-4">
             <Card>
               <CardHeader className="pb-2 pt-3 px-3">

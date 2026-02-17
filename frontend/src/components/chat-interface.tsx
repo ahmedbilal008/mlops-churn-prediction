@@ -225,7 +225,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 const SUGGESTIONS = [
   "What's the current system status?",
   "Show me the model leaderboard",
-  "Predict churn for a customer with 2 months tenure paying $80/month",
+  "Predict churn for a senior citizen with fiber optic internet on a month-to-month contract",
   "What are the most important features for churn?",
   "Tell me about the dataset",
 ];
