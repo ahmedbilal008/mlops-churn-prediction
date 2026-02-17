@@ -16,16 +16,16 @@ The MCP server exposes **10 tools** that an LLM agent can invoke:
 
 | Tool | What It Does |
 |------|-------------|
-| `predict_churn` | Predict churn probability for a customer. All 19 features are optional — unspecified ones use dataset defaults (mode/median from the training set). Returns probability, risk level, and top SHAP drivers. |
-| `explain_prediction` | Full SHAP breakdown for a single prediction — per-feature contributions, base value, top positive/negative drivers. |
+| `predict_churn` | Predict churn probability for a customer. All 19 features are optional, unspecified ones use dataset defaults (mode/median from the training set). Returns probability, risk level, and top SHAP drivers. |
+| `explain_prediction` | Full SHAP breakdown for a single prediction; per-feature contributions, base value, top positive/negative drivers. |
 | `get_model_metrics` | Performance metrics for a specific model (accuracy, precision, recall, F1, ROC-AUC). |
 | `compare_models` | Leaderboard of all trained models, ranked by F1 score. |
-| `get_dataset_summary` | Dataset statistics — row count, churn rate, feature distributions, class balance. |
+| `get_dataset_summary` | Dataset statistics like row count, churn rate, feature distributions, class balance. |
 | `get_feature_importance` | Global SHAP feature importance rankings across all customers. |
-| `retrain_model` | Triggers full retraining pipeline — trains 3 models, selects best, logs to MLflow. Thread-safe (one retrain at a time). |
+| `retrain_model` | Triggers full retraining pipeline, trains 3 models, selects best, logs to MLflow. Thread-safe (one retrain at a time). |
 | `add_customer_record` | Append a validated customer record to the dataset. |
-| `get_active_model_info` | Info about the deployed model — name, metrics, training time, dataset size. |
-| `system_status` | Platform health check — model loaded, SHAP ready, data available, retrain lock status, uptime. |
+| `get_active_model_info` | Info about the deployed model name, metrics, training time, dataset size. |
+| `system_status` | Platform health check: model loaded, SHAP ready, data available, retrain lock status, uptime. |
 
 ---
 
@@ -44,7 +44,7 @@ The frontend and backend are fully independent services. The web client communic
 
 ## What is MCP?
 
-**Model Context Protocol** is an open standard (by Anthropic) that allows LLMs to call external tools and services through a structured interface. Instead of building custom API integrations, MCP provides a universal protocol — the LLM sees typed tool schemas, decides which tool to call, fills parameters, and receives structured results. This system uses MCP with SSE (Server-Sent Events) transport over HTTP.
+**Model Context Protocol** is an open standard (by Anthropic) that allows LLMs to call external tools and services through a structured interface. Instead of building custom API integrations, MCP provides a universal protocol, the LLM sees typed tool schemas, decides which tool to call, fills parameters, and receives structured results. This system uses MCP with SSE (Server-Sent Events) transport over HTTP.
 
 ---
 
@@ -216,9 +216,3 @@ dvc dag
 ```
 
 Four stages: `ingest → feature_engineering → train → evaluate`. Parameters in `params.yaml`, data tracked via `.dvc` pointer files.
-
----
-
-## License
-
-MIT
