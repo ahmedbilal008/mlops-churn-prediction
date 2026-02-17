@@ -1,0 +1,192 @@
+schema: '2.0'
+stages:
+  ingest:
+    cmd: uv run python -m src.services.pipelines.training_pipeline --stage 
+      ingest
+    deps:
+    - path: data/raw/churn.csv
+      hash: md5
+      md5: 0f9de68e012bd3aed5fa7cdc9fc421af
+      size: 977501
+    - path: src/core/data/loader.py
+      hash: md5
+      md5: 2bd6103297d85b428f9a36b9d0c24d54
+      size: 3038
+    - path: src/core/data/validator.py
+      hash: md5
+      md5: 0b6c5cd4bdafaa202b8dea1f2f757081
+      size: 2071
+    outs:
+    - path: data/processed/cleaned.csv
+      hash: md5
+      md5: 7dcfd0992df59c0cd8dcddab8a20d2ec
+      size: 978955
+  feature_engineer:
+    cmd: uv run python -m src.services.pipelines.training_pipeline --stage 
+      features
+    deps:
+    - path: data/processed/cleaned.csv
+      hash: md5
+      md5: 7dcfd0992df59c0cd8dcddab8a20d2ec
+      size: 978955
+    - path: src/core/features/engineer.py
+      hash: md5
+      md5: bde25703f772a5d04f5477e4cf6d2110
+      size: 3689
+    params:
+      params.yaml:
+        features:
+          target_column: Churn
+          id_column: customerID
+          numerical_columns:
+          - tenure
+          - MonthlyCharges
+          - TotalCharges
+          - SeniorCitizen
+          - avg_charges_per_month
+          - charges_ratio
+          - num_services
+          - senior_high_charges
+          categorical_columns:
+          - gender
+          - Partner
+          - Dependents
+          - PhoneService
+          - MultipleLines
+          - InternetService
+          - OnlineSecurity
+          - OnlineBackup
+          - DeviceProtection
+          - TechSupport
+          - StreamingTV
+          - StreamingMovies
+          - Contract
+          - PaperlessBilling
+          - PaymentMethod
+          - tenure_group
+          - has_internet
+    outs:
+    - path: data/processed/featured.csv
+      hash: md5
+      md5: 3ecc4448bebff1e69462e3f137640a4c
+      size: 1308208
+  train:
+    cmd: uv run python -m src.services.pipelines.training_pipeline --stage train
+    deps:
+    - path: data/processed/featured.csv
+      hash: md5
+      md5: 3ecc4448bebff1e69462e3f137640a4c
+      size: 1308208
+    - path: src/core/data/preprocessor.py
+      hash: md5
+      md5: 6279a55da0410c64851fa2b123052b95
+      size: 5959
+    - path: src/core/models/trainer.py
+      hash: md5
+      md5: d4a6d447f4e0c75d5214a80d809ca07c
+      size: 10632
+    params:
+      params.yaml:
+        data.random_state: 42
+        data.test_size: 0.2
+        models:
+          default_model: random_forest
+          logistic_regression:
+            C: 1.0
+            max_iter: 1000
+            solver: lbfgs
+            class_weight: balanced
+          random_forest:
+            n_estimators: 200
+            max_depth: 10
+            min_samples_split: 5
+            min_samples_leaf: 2
+            class_weight: balanced
+            random_state: 42
+          xgboost:
+            n_estimators: 200
+            max_depth: 6
+            learning_rate: 0.1
+            subsample: 0.8
+            colsample_bytree: 0.8
+            scale_pos_weight: 2.76
+            random_state: 42
+            eval_metric: logloss
+    outs:
+    - path: data/processed/X_test.pkl
+      hash: md5
+      md5: fe06beaa9298270040202144f05e2a0b
+      size: 439849
+    - path: data/processed/y_test.pkl
+      hash: md5
+      md5: f424ba2d5bdbea56de19eb5dac3cc324
+      size: 11497
+    - path: models/best_model.pkl
+      hash: md5
+      md5: 8dc71f9b0b526db27a7170b1aa47fbdd
+      size: 8969737
+    - path: models/logistic_regression.pkl
+      hash: md5
+      md5: af7a780f49504eee5e402e1dee4b88dc
+      size: 1183
+    - path: models/metadata.pkl
+      hash: md5
+      md5: 36349bd22e94e84386b7d5d1cead10f2
+      size: 1036
+    - path: models/preprocessor.pkl
+      hash: md5
+      md5: 9b56a3f18ba04912ac8a20c2a22d433c
+      size: 8726
+    - path: models/random_forest.pkl
+      hash: md5
+      md5: 8dc71f9b0b526db27a7170b1aa47fbdd
+      size: 8969737
+    - path: models/shap_background.pkl
+      hash: md5
+      md5: dc9df99423101e2c44226412af002237
+      size: 31425
+    - path: models/training_metrics.json
+      hash: md5
+      md5: 34b35fdcc231f8502023cf549947479e
+      size: 701
+    - path: models/xgboost.pkl
+      hash: md5
+      md5: 5c8af8fe9770343ed3df9c2aac801930
+      size: 646917
+  evaluate:
+    cmd: uv run python -m src.services.pipelines.training_pipeline --stage 
+      evaluate
+    deps:
+    - path: data/processed/X_test.pkl
+      hash: md5
+      md5: fe06beaa9298270040202144f05e2a0b
+      size: 439849
+    - path: data/processed/y_test.pkl
+      hash: md5
+      md5: f424ba2d5bdbea56de19eb5dac3cc324
+      size: 11497
+    - path: models/best_model.pkl
+      hash: md5
+      md5: 8dc71f9b0b526db27a7170b1aa47fbdd
+      size: 8969737
+    - path: models/metadata.pkl
+      hash: md5
+      md5: 36349bd22e94e84386b7d5d1cead10f2
+      size: 1036
+    - path: models/preprocessor.pkl
+      hash: md5
+      md5: 9b56a3f18ba04912ac8a20c2a22d433c
+      size: 8726
+    - path: models/shap_background.pkl
+      hash: md5
+      md5: dc9df99423101e2c44226412af002237
+      size: 31425
+    outs:
+    - path: models/evaluation.json
+      hash: md5
+      md5: 5ea0044c3b3a3e83d8ac526219263b2a
+      size: 1353
+    - path: models/plots/shap_summary.png
+      hash: md5
+      md5: 2762ca6b2326f1599322420107041e33
+      size: 186343
