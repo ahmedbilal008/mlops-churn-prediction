@@ -13,7 +13,7 @@ export default function Home() {
           </div>
           <div>
             <h1 className="text-sm font-semibold leading-none">
-              Churn Intelligence Platform
+              Agentic Churn Intelligence
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
               MCP · MLflow · Gemini · SHAP

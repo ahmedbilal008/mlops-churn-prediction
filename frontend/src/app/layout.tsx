@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Churn Intelligence Platform",
+  title: "Agentic Churn Intelligence",
   description:
-    "AI-powered customer churn prediction and MLOps dashboard with Gemini integration",
+    "MCP-powered MLOps system for customer churn prediction, explainability, and retraining through LLM tool calling",
 };
 
 export default function RootLayout({

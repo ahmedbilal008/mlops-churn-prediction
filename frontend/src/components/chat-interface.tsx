@@ -329,11 +329,11 @@ export default function ChatInterface() {
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Bot className="h-12 w-12 text-muted-foreground mb-4" />
               <h2 className="text-xl font-semibold mb-2">
-                Churn Intelligence Assistant
+                Agentic Churn Intelligence
               </h2>
               <p className="text-muted-foreground text-sm max-w-md mb-8">
-                Ask me about customer churn predictions, model performance, or
-                dataset insights. I have access to the full MCP platform.
+                Interact with ML models through an AI agent. Ask about churn predictions,
+                model performance, SHAP explanations, or dataset insights.
               </p>
               <div className="flex flex-wrap gap-2 justify-center max-w-lg">
                 {SUGGESTIONS.map((s, i) => (

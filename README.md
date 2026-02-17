@@ -1,86 +1,127 @@
-# Agentic Churn Intelligence Platform
+# Agentic Churn Intelligence — MCP-Powered MLOps System with LLM Tooling
 
-## AI-Agent-Ready MLOps System for Customer Churn Prediction
-
-A portfolio-grade MLOps system that combines multi-model machine learning, SHAP explainability, and the **Model Context Protocol (MCP)** to create a fully agentic churn prediction service. Built with production-grade practices: experiment tracking (MLflow), data versioning (DVC), reproducible pipelines, and comprehensive testing.
-
-An AI agent (Gemini, Claude, etc.) connects via MCP and can predict churn, explain predictions, compare models, inspect data, and trigger retraining — all through structured tool calls.
+An end-to-end machine learning system for telecom customer churn prediction, built around the **Model Context Protocol (MCP)**. An LLM agent (Gemini) interacts with the ML backend through structured tool calls — predicting churn, explaining predictions with SHAP, comparing models, inspecting data, and triggering retraining. The system integrates experiment tracking (MLflow), data versioning (DVC), a reproducible training pipeline, and a chat-based web client.
 
 ---
 
-## Key Features
+## Architecture
 
-- **7 MCP Tools** — predict, explain, compare, inspect, retrain, and add data — all callable by AI agents over SSE/stdio
-- **3 Models** — Logistic Regression, Random Forest, XGBoost — trained, compared, and auto-selected by F1 score
-- **SHAP Explainability** — per-prediction feature contributions and global importance plots via TreeExplainer / LinearExplainer
-- **MLflow Experiment Tracking** — every run logs params, metrics, confusion matrices, ROC curves, feature importance plots
-- **DVC Pipeline** — 4-stage reproducible pipeline (ingest → features → train → evaluate) with `params.yaml`-driven config
-- **Pydantic Validation** — type-safe schemas at every boundary (data ingestion, API contracts, responses)
-- **Class Imbalance Handling** — `class_weight='balanced'` (sklearn) and `scale_pos_weight=2.76` (XGBoost) for the 73/27 split
-- **Modular Architecture** — clean separation: config → data → features → models → explainability → pipelines → MCP
+![Architecture Diagram](docs/architecture.png)
+
+---
+
+## System Capabilities
+
+The MCP server exposes **10 tools** that an LLM agent can invoke:
+
+| Tool | What It Does |
+|------|-------------|
+| `predict_churn` | Predict churn probability for a customer. All 19 features are optional — unspecified ones use dataset defaults (mode/median from the training set). Returns probability, risk level, and top SHAP drivers. |
+| `explain_prediction` | Full SHAP breakdown for a single prediction — per-feature contributions, base value, top positive/negative drivers. |
+| `get_model_metrics` | Performance metrics for a specific model (accuracy, precision, recall, F1, ROC-AUC). |
+| `compare_models` | Leaderboard of all trained models, ranked by F1 score. |
+| `get_dataset_summary` | Dataset statistics — row count, churn rate, feature distributions, class balance. |
+| `get_feature_importance` | Global SHAP feature importance rankings across all customers. |
+| `retrain_model` | Triggers full retraining pipeline — trains 3 models, selects best, logs to MLflow. Thread-safe (one retrain at a time). |
+| `add_customer_record` | Append a validated customer record to the dataset. |
+| `get_active_model_info` | Info about the deployed model — name, metrics, training time, dataset size. |
+| `system_status` | Platform health check — model loaded, SHAP ready, data available, retrain lock status, uptime. |
+
+---
+
+## Web Client
+
+The system includes a **Next.js web interface** where users interact through a chat UI:
+
+- **Stack**: Next.js (App Router) · TypeScript · Tailwind CSS · shadcn/ui
+- **AI Agent**: Gemini 2.5 Flash with function calling
+- **Flow**: User asks a question → Gemini decides which MCP tool(s) to call → Next.js API routes bridge the call to the MCP server via SSE → result flows back through Gemini → natural language answer displayed in chat
+- **Sidebar dashboard**: Live system status, model leaderboard, dataset summary, and a tools reference panel showing all available MCP tools with their parameters
+
+The frontend and backend are fully independent services. The web client communicates with the MCP server exclusively through SSE transport.
+
+---
+
+## What is MCP?
+
+**Model Context Protocol** is an open standard (by Anthropic) that allows LLMs to call external tools and services through a structured interface. Instead of building custom API integrations, MCP provides a universal protocol — the LLM sees typed tool schemas, decides which tool to call, fills parameters, and receives structured results. This system uses MCP with SSE (Server-Sent Events) transport over HTTP.
+
+---
+
+## Architecture Overview
+
+The system follows a **hexagonal architecture** (ports and adapters) with three layers:
+
+**Frontend** — Next.js web client with chat interface. API routes act as the MCP bridge. Gemini handles natural language ↔ tool call translation.
+
+**MCP Server** — FastMCP with SSE transport (port 8000). Thin routing layer — validates inputs, calls core services, serializes responses. 10 tools exposed.
+
+**Core ML** — All machine learning logic, isolated from how it's served:
+- `core/data/` — Data loading, validation (Pydantic), preprocessing (OneHotEncoder + StandardScaler)
+- `core/features/` — Feature engineering: tenure groups, charge ratios, service counts, interaction features (19 raw → 25 engineered → 39 after encoding)
+- `core/models/` — Model training (Logistic Regression, Random Forest, XGBoost), selection by F1 score, MLflow logging
+- `core/explainability/` — SHAP TreeExplainer for per-prediction and global feature importance
+- `services/pipelines/` — Training pipeline orchestrator (ingest → engineer → train → evaluate)
+
+**Infrastructure** — MLflow (experiment tracking + model registry), DVC (dataset versioning + reproducible pipeline), Docker (backend containerization).
+
+---
+
+## Technology Stack
+
+| Layer | Technology | Role |
+|-------|-----------|------|
+| Frontend | Next.js · TypeScript · Tailwind · shadcn/ui | Chat UI + MCP bridge |
+| AI Agent | Gemini 2.5 Flash | Function calling, natural language synthesis |
+| Agent Protocol | FastMCP (SSE transport) | LLM ↔ ML backend communication |
+| ML Models | scikit-learn · XGBoost | Logistic Regression, Random Forest, XGBoost |
+| Explainability | SHAP | Per-prediction + global feature importance |
+| Experiment Tracking | MLflow | Params, metrics, artifacts, model registry |
+| Data Versioning | DVC | Reproducible pipeline, dataset tracking |
+| Validation | Pydantic | Type-safe schemas at data boundaries |
+| Containerization | Docker | Backend deployment |
+| Runtime | Python 3.12 · uv | Dependency management |
+| Testing | pytest | Schema, model, and MCP integration tests |
 
 ---
 
 ## Quick Start
 
+### Backend
+
 ```bash
-# 1. Install dependencies (requires Python 3.12 and uv)
+# Install dependencies (requires Python 3.12 and uv)
 uv sync
 
-# 2. Train all models (full pipeline)
+# Train all models
 uv run python main.py train
 
-# 3. Start MCP server (SSE transport for Gemini / AI agents)
+# Start MCP server (SSE transport, port 8000)
 uv run python main.py serve
 
-# 4. Run tests
+# Run tests
 uv run pytest tests/ -v
 ```
 
-### CLI Options
+### Frontend
 
 ```bash
-# Train with full pipeline (ingest → features → train → evaluate)
-uv run python main.py train
+cd frontend
 
-# Start MCP server with SSE transport (default, port 8000)
-uv run python main.py serve
+# Install dependencies
+npm install
 
-# Start MCP server with stdio transport
-uv run python main.py serve --transport stdio
+# Set environment variables
+cp .env.example .env.local
+# Add your GEMINI_API_KEY to .env.local
 
-# Run individual pipeline stages (used by DVC)
-uv run python -m src.pipelines.training_pipeline --stage ingest
-uv run python -m src.pipelines.training_pipeline --stage feature_engineering
-uv run python -m src.pipelines.training_pipeline --stage train
-uv run python -m src.pipelines.training_pipeline --stage evaluate
-uv run python -m src.pipelines.training_pipeline --stage full
+# Start development server
+npm run dev
 ```
 
----
+### Connecting AI Agents
 
-## MCP Tools
-
-The system exposes 7 tools via the Model Context Protocol:
-
-| Tool | Description |
-|------|-------------|
-| `predict_churn` | Predict churn probability for a customer (19 input features) — returns probability, risk level, top SHAP drivers |
-| `explain_prediction` | Full SHAP explanation for a single customer — all feature contributions + base value |
-| `model_metrics` | Get performance metrics for any model (or "best") — accuracy, precision, recall, F1, AUC |
-| `compare_models` | Leaderboard of all trained models from MLflow — sorted by F1 score |
-| `dataset_summary` | Dataset statistics — row counts, churn rate, feature distributions |
-| `retrain_model` | Trigger full pipeline retraining — clears model cache, retrains all models |
-| `add_customer_record` | Append a new validated customer record to the dataset |
-
-### Connecting an AI Agent
-
-**Gemini (SSE transport):**
-```bash
-uv run python main.py serve
-# Server starts at http://localhost:8000/sse
-# Point your Gemini MCP client to this endpoint
-```
+**Gemini (via web client):** Start both servers — the web client handles everything.
 
 **Claude Desktop (stdio transport):**
 ```json
@@ -97,150 +138,84 @@ uv run python main.py serve
 
 ---
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    AI Agent (Gemini / Claude)            │
-│                         ↕ MCP (SSE/stdio)               │
-├─────────────────────────────────────────────────────────┤
-│                    src/mcp/server.py                     │
-│              7 MCP Tools + Model Cache                   │
-├──────────┬──────────┬───────────┬───────────────────────┤
-│ schemas/ │ models/  │ explain/  │ pipelines/            │
-│ Pydantic │ trainer  │ SHAP      │ training_pipeline     │
-│ models   │ registry │ explainer │ (4-stage orchestrator) │
-├──────────┴──────────┴───────────┴───────────────────────┤
-│   data/loader    data/validator    data/preprocessor     │
-│   features/engineer    config/settings    utils/logger   │
-├─────────────────────────────────────────────────────────┤
-│  MLflow (tracking/mlflow.db)  │  DVC (dvc.yaml)         │
-│  Experiment runs & artifacts  │  Reproducible pipeline   │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Data Flow
-
-1. **Ingest** — Load raw CSV → clean (fix types, fill NaN, dedup) → validate with Pydantic (sample) → save cleaned CSV
-2. **Feature Engineering** — Add 6 derived features (tenure_group, avg_charges_per_month, charges_ratio, num_services, has_internet, senior_high_charges)
-3. **Train** — Stratified 80/20 split → fit ColumnTransformer (StandardScaler + OneHotEncoder) → train 3 models → log to MLflow → select best by F1
-4. **Evaluate** — Load best model → compute SHAP global importance → save summary plot + evaluation JSON
-
----
-
 ## Project Structure
 
 ```
-├── params.yaml                  # Centralized configuration (DVC params)
-├── dvc.yaml                     # DVC 4-stage pipeline definition
-├── main.py                      # CLI entry point (train / serve)
-├── pyproject.toml               # Dependencies and project config
+├── main.py                          # CLI entry point (train / serve)
+├── params.yaml                      # ML hyperparameters (DVC-tracked)
+├── dvc.yaml                         # 4-stage pipeline definition
+├── Dockerfile                       # Backend container
 │
 ├── src/
-│   ├── config/
-│   │   └── settings.py          # Load params.yaml, typed accessors
-│   ├── data/
-│   │   ├── loader.py            # Raw data ingestion & cleaning
-│   │   ├── validator.py         # Pydantic-based row validation
-│   │   └── preprocessor.py      # ColumnTransformer (scaler + encoder)
-│   ├── features/
-│   │   └── engineer.py          # 6 derived features (row-level, pre-split safe)
-│   ├── models/
-│   │   ├── trainer.py           # Model factory, training, MLflow logging
-│   │   └── registry.py          # Best model selection, leaderboard
-│   ├── explainability/
-│   │   └── shap_explainer.py    # SHAP TreeExplainer / LinearExplainer
-│   ├── pipelines/
-│   │   └── training_pipeline.py # 4-stage orchestrator + CLI
-│   ├── mcp/
-│   │   └── server.py            # 7 MCP tools + FastMCP server
-│   ├── schemas/
-│   │   └── models.py            # Pydantic models (9 schemas)
-│   └── utils/
-│       └── logger.py            # Structured logging setup
+│   ├── config/settings.py           # Config: params.yaml + env vars
+│   ├── core/
+│   │   ├── data/
+│   │   │   ├── loader.py            # Data ingestion + cleaning
+│   │   │   ├── validator.py         # Pydantic row validation
+│   │   │   └── preprocessor.py      # ColumnTransformer (scaler + encoder)
+│   │   ├── features/engineer.py     # 6 derived features (row-level)
+│   │   ├── models/
+│   │   │   ├── trainer.py           # Train 3 models, log to MLflow
+│   │   │   └── registry.py          # Best model selection
+│   │   └── explainability/
+│   │       └── shap_explainer.py    # SHAP TreeExplainer
+│   ├── services/pipelines/
+│   │   └── training_pipeline.py     # 4-stage orchestrator
+│   ├── interfaces/mcp/server.py     # 10 MCP tools + FastMCP server
+│   └── schemas/models.py            # Pydantic schemas
 │
-├── tests/
-│   ├── test_schemas.py          # Schema validation tests
-│   ├── test_model.py            # Model artifact + feature engineering tests
-│   └── test_mcp_tools.py        # MCP tool integration tests
+├── frontend/
+│   ├── src/app/
+│   │   ├── page.tsx                 # Main layout (chat + sidebar)
+│   │   ├── api/chat/route.ts        # Gemini integration
+│   │   └── api/mcp/[tool]/route.ts  # MCP-to-HTTP bridge
+│   ├── src/components/
+│   │   ├── chat-interface.tsx        # Chat UI with message bubbles
+│   │   └── sidebar.tsx              # Dashboard: tools, status, models, data
+│   └── src/lib/
+│       ├── mcp-tools.ts             # 10 tool declarations for Gemini
+│       └── types.ts                 # TypeScript interfaces
 │
-├── data/
-│   ├── raw/churn.csv            # Original Telco Customer Churn dataset
-│   └── processed/               # Pipeline outputs (cleaned.csv, featured.csv, splits)
-│
-├── models/                      # Trained model artifacts
-│   ├── best_model.pkl           # Auto-selected best model
-│   ├── preprocessor.pkl         # Fitted ColumnTransformer
-│   ├── shap_background.pkl      # SHAP background data (100 samples)
-│   ├── training_metrics.json    # All model metrics
-│   ├── evaluation.json          # Best model evaluation
-│   └── plots/                   # Confusion matrices, ROC curves, SHAP summary
-│
-├── tracking/
-│   └── mlflow.db                # MLflow SQLite backend
-│
-└── mlruns/                      # MLflow artifact store
+├── tests/                           # pytest: schemas, models, MCP tools
+├── data/raw/churn.csv               # Telco Customer Churn dataset (DVC-tracked)
+├── models/                          # Trained artifacts (pkl, metrics, plots)
+└── tracking/mlflow.db               # MLflow SQLite backend
 ```
 
 ---
 
-## Technology Stack
+## Experiments
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| Runtime | Python 3.12 + uv | Fast dependency management, reproducible env |
-| ML Models | scikit-learn, XGBoost | Logistic Regression, Random Forest, XGBoost |
-| Explainability | SHAP | Per-prediction and global feature importance |
-| Agent Protocol | FastMCP | MCP server with SSE/stdio/streamable-http transport |
-| Experiment Tracking | MLflow | Params, metrics, artifacts, model registry |
-| Data Versioning | DVC | Reproducible pipeline stages, data tracking |
-| Validation | Pydantic | Type-safe schemas at every data boundary |
-| Testing | pytest | Schema, model artifact, and MCP integration tests |
+MLflow tracks every training run — parameters, metrics, confusion matrices, ROC curves, and feature importance plots.
 
----
+```bash
+uv run mlflow ui --backend-store-uri sqlite:///tracking/mlflow.db
+# Open http://localhost:5000
+```
 
-## Model Performance
+Latest results (Telco Churn — 7,043 records, 26.5% churn rate):
 
-Results from the latest training run on Telco Customer Churn (7,043 records, 26.5% churn rate):
+| Model | F1 | ROC-AUC | Precision | Recall |
+|-------|-----|---------|-----------|--------|
+| Logistic Regression | 0.615 | 0.847 | 0.500 | 0.799 |
+| **Random Forest** | **0.622** | **0.843** | **0.544** | **0.725** |
+| XGBoost | 0.611 | 0.830 | 0.544 | 0.698 |
 
-| Model | F1 Score | AUC-ROC | Precision | Recall |
-|-------|----------|---------|-----------|--------|
-| Logistic Regression | 0.615 | 0.847 | — | — |
-| **Random Forest** (best) | **0.622** | **0.843** | **0.544** | **0.725** |
-| XGBoost | 0.611 | 0.830 | — | — |
-
-Best model auto-selected by F1 score. All models handle class imbalance via balanced class weights.
+Best model auto-selected by F1 score. Class imbalance handled via balanced weights.
 
 ---
 
 ## DVC Pipeline
 
-Reproduce the full pipeline:
-
 ```bash
-# Run all stages
+# Reproduce full pipeline
 dvc repro
-
-# Run a single stage
-dvc repro train
 
 # View pipeline DAG
 dvc dag
 ```
 
-Pipeline stages and their dependencies are defined in `dvc.yaml`, parameterized by `params.yaml`.
-
----
-
-## Viewing Experiments
-
-Launch the MLflow UI to inspect all training runs:
-
-```bash
-uv run mlflow ui --backend-store-uri sqlite:///tracking/mlflow.db
-```
-
-Access at `http://localhost:5000`. Each run includes logged parameters, metrics, confusion matrix plots, ROC curves, and feature importance charts.
+Four stages: `ingest → feature_engineering → train → evaluate`. Parameters in `params.yaml`, data tracked via `.dvc` pointer files.
 
 ---
 
