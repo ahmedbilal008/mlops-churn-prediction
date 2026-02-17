@@ -1,0 +1,84 @@
+# ============================================================================
+# Churn Intelligence Platform — Configuration
+# ============================================================================
+# All hyperparameters and paths in one place.
+# DVC reads this file automatically for pipeline reproducibility.
+# Change a value here → DVC knows which stages need re-running.
+# ============================================================================
+
+data:
+  raw_path: data/raw/churn.csv
+  processed_dir: data/processed
+  test_size: 0.2
+  random_state: 42
+
+features:
+  target_column: Churn
+  id_column: customerID
+
+  # After feature engineering, these are the final column lists
+  # fed into the ColumnTransformer preprocessor.
+  numerical_columns:
+    - tenure
+    - MonthlyCharges
+    - TotalCharges
+    - SeniorCitizen          # already 0/1, scaling is harmless
+    - avg_charges_per_month   # engineered
+    - charges_ratio           # engineered
+    - num_services            # engineered
+    - senior_high_charges     # engineered
+
+  categorical_columns:
+    - gender
+    - Partner
+    - Dependents
+    - PhoneService
+    - MultipleLines
+    - InternetService
+    - OnlineSecurity
+    - OnlineBackup
+    - DeviceProtection
+    - TechSupport
+    - StreamingTV
+    - StreamingMovies
+    - Contract
+    - PaperlessBilling
+    - PaymentMethod
+    - tenure_group            # engineered
+    - has_internet            # engineered
+
+models:
+  default_model: random_forest
+
+  logistic_regression:
+    C: 1.0
+    max_iter: 1000
+    solver: lbfgs
+    class_weight: balanced    # handles class imbalance automatically
+
+  random_forest:
+    n_estimators: 200
+    max_depth: 10
+    min_samples_split: 5
+    min_samples_leaf: 2
+    class_weight: balanced
+    random_state: 42
+
+  xgboost:
+    n_estimators: 200
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    scale_pos_weight: 2.76    # ~5174/1869 — compensates for class imbalance
+    random_state: 42
+    eval_metric: logloss
+
+mlflow:
+  tracking_uri: sqlite:///tracking/mlflow.db
+  experiment_name: Churn_Intelligence
+
+paths:
+  models_dir: models
+  plots_dir: models/plots
+  tracking_dir: tracking

@@ -1,0 +1,69 @@
+# ============================================================================
+# DVC Pipeline — Churn Intelligence Platform
+# ============================================================================
+# Run the full pipeline:  uv run dvc repro
+# Run a single stage:     uv run dvc repro <stage_name>
+# Show pipeline DAG:      uv run dvc dag
+#
+# DVC only re-runs stages when their dependencies change.
+# ============================================================================
+
+stages:
+  ingest:
+    cmd: uv run python -m src.services.pipelines.training_pipeline --stage ingest
+    deps:
+      - data/raw/churn.csv
+      - src/core/data/loader.py
+      - src/core/data/validator.py
+    outs:
+      - data/processed/cleaned.csv
+
+  feature_engineer:
+    cmd: uv run python -m src.services.pipelines.training_pipeline --stage features
+    deps:
+      - data/processed/cleaned.csv
+      - src/core/features/engineer.py
+    params:
+      - features
+    outs:
+      - data/processed/featured.csv
+
+  train:
+    cmd: uv run python -m src.services.pipelines.training_pipeline --stage train
+    deps:
+      - data/processed/featured.csv
+      - src/core/models/trainer.py
+      - src/core/data/preprocessor.py
+    params:
+      - models
+      - data.test_size
+      - data.random_state
+    outs:
+      - models/preprocessor.pkl
+      - models/logistic_regression.pkl
+      - models/random_forest.pkl
+      - models/xgboost.pkl
+      - models/best_model.pkl
+      - models/metadata.pkl
+      - models/shap_background.pkl
+      - data/processed/X_test.pkl
+      - data/processed/y_test.pkl
+    metrics:
+      - models/training_metrics.json:
+          cache: false
+
+  evaluate:
+    cmd: uv run python -m src.services.pipelines.training_pipeline --stage evaluate
+    deps:
+      - models/best_model.pkl
+      - models/preprocessor.pkl
+      - models/metadata.pkl
+      - models/shap_background.pkl
+      - data/processed/X_test.pkl
+      - data/processed/y_test.pkl
+    metrics:
+      - models/evaluation.json:
+          cache: false
+    plots:
+      - models/plots/shap_summary.png:
+          cache: false

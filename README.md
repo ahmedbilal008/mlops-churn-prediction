@@ -1,163 +1,249 @@
-# Agentic Sentinel
+# Agentic Churn Intelligence Platform
 
-A production-ready MLOps system for customer churn prediction, integrating DVC for data versioning, MLflow for experiment tracking, and Model Context Protocol (MCP) for AI-powered inference.
+## AI-Agent-Ready MLOps System for Customer Churn Prediction
 
-## Overview
+A portfolio-grade MLOps system that combines multi-model machine learning, SHAP explainability, and the **Model Context Protocol (MCP)** to create a fully agentic churn prediction service. Built with production-grade practices: experiment tracking (MLflow), data versioning (DVC), reproducible pipelines, and comprehensive testing.
 
-Agentic Sentinel demonstrates modern MLOps practices for building, tracking, and deploying machine learning models. The system predicts customer churn risk using a Random Forest classifier trained on telco customer data.
+An AI agent (Gemini, Claude, etc.) connects via MCP and can predict churn, explain predictions, compare models, inspect data, and trigger retraining — all through structured tool calls.
 
-## Architecture
+---
 
-- **Environment Management**: `uv` for fast, reliable Python dependency management
-- **Data Versioning**: DVC with local storage backend
-- **Experiment Tracking**: MLflow with SQLite backend
-- **Model Serving**: FastMCP server for Claude Desktop integration
-- **CI/CD**: GitHub Actions for automated testing
+## Key Features
 
-## Project Structure
+- **7 MCP Tools** — predict, explain, compare, inspect, retrain, and add data — all callable by AI agents over SSE/stdio
+- **3 Models** — Logistic Regression, Random Forest, XGBoost — trained, compared, and auto-selected by F1 score
+- **SHAP Explainability** — per-prediction feature contributions and global importance plots via TreeExplainer / LinearExplainer
+- **MLflow Experiment Tracking** — every run logs params, metrics, confusion matrices, ROC curves, feature importance plots
+- **DVC Pipeline** — 4-stage reproducible pipeline (ingest → features → train → evaluate) with `params.yaml`-driven config
+- **Pydantic Validation** — type-safe schemas at every boundary (data ingestion, API contracts, responses)
+- **Class Imbalance Handling** — `class_weight='balanced'` (sklearn) and `scale_pos_weight=2.76` (XGBoost) for the 73/27 split
+- **Modular Architecture** — clean separation: config → data → features → models → explainability → pipelines → MCP
 
-```
-.
-├── src/
-│   ├── schemas.py          # Pydantic data validation models
-│   ├── train.py            # Training pipeline with MLflow logging
-│   └── mcp_server.py       # FastMCP server for predictions
-├── tests/
-│   ├── test_schemas.py     # Schema validation tests
-│   └── test_model.py       # Model inference tests
-├── data/
-│   └── churn.csv.dvc       # DVC-tracked dataset
-├── models/
-│   └── churn_model.pkl     # Trained model artifact
-├── tracking/
-│   └── mlflow.db           # MLflow tracking database
-├── .github/workflows/
-│   └── ci.yml              # CI/CD pipeline
-└── pyproject.toml          # Project dependencies
-```
+---
 
-## Setup
+## Quick Start
 
-### Prerequisites
-
-- Python 3.14+
-- uv package manager
-- Git
-
-### Installation
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd agentic_sentinel
-```
-
-2. Install dependencies:
-```bash
+# 1. Install dependencies (requires Python 3.12 and uv)
 uv sync
-```
 
-3. Pull data from DVC:
-```bash
-uv run dvc pull
-```
+# 2. Train all models (full pipeline)
+uv run python main.py train
 
-## Usage
+# 3. Start MCP server (SSE transport for Gemini / AI agents)
+uv run python main.py serve
 
-### Training the Model
-
-Run the training pipeline:
-
-```bash
-uv run python src/train.py
-```
-
-This will:
-- Load and validate data using Pydantic schemas
-- Train a Random Forest classifier
-- Log metrics and parameters to MLflow
-- Save the model to `models/churn_model.pkl`
-
-### Viewing Experiments
-
-Launch MLflow UI:
-
-```bash
-uv run mlflow ui --backend-store-uri sqlite:///tracking/mlflow.db
-```
-
-Access at `http://localhost:5000`
-
-### Running Tests
-
-Execute the test suite:
-
-```bash
+# 4. Run tests
 uv run pytest tests/ -v
 ```
 
-### MCP Server Integration
+### CLI Options
 
-Configure Claude Desktop by adding to `claude_desktop_config.json`:
+```bash
+# Train with full pipeline (ingest → features → train → evaluate)
+uv run python main.py train
 
+# Start MCP server with SSE transport (default, port 8000)
+uv run python main.py serve
+
+# Start MCP server with stdio transport
+uv run python main.py serve --transport stdio
+
+# Run individual pipeline stages (used by DVC)
+uv run python -m src.pipelines.training_pipeline --stage ingest
+uv run python -m src.pipelines.training_pipeline --stage feature_engineering
+uv run python -m src.pipelines.training_pipeline --stage train
+uv run python -m src.pipelines.training_pipeline --stage evaluate
+uv run python -m src.pipelines.training_pipeline --stage full
+```
+
+---
+
+## MCP Tools
+
+The system exposes 7 tools via the Model Context Protocol:
+
+| Tool | Description |
+|------|-------------|
+| `predict_churn` | Predict churn probability for a customer (19 input features) — returns probability, risk level, top SHAP drivers |
+| `explain_prediction` | Full SHAP explanation for a single customer — all feature contributions + base value |
+| `model_metrics` | Get performance metrics for any model (or "best") — accuracy, precision, recall, F1, AUC |
+| `compare_models` | Leaderboard of all trained models from MLflow — sorted by F1 score |
+| `dataset_summary` | Dataset statistics — row counts, churn rate, feature distributions |
+| `retrain_model` | Trigger full pipeline retraining — clears model cache, retrains all models |
+| `add_customer_record` | Append a new validated customer record to the dataset |
+
+### Connecting an AI Agent
+
+**Gemini (SSE transport):**
+```bash
+uv run python main.py serve
+# Server starts at http://localhost:8000/sse
+# Point your Gemini MCP client to this endpoint
+```
+
+**Claude Desktop (stdio transport):**
 ```json
 {
   "mcpServers": {
-    "sentinel": {
+    "churn-intelligence": {
       "command": "uv",
-      "args": ["run", "python", "src/mcp_server.py"],
-      "cwd": "/path/to/agentic_sentinel"
+      "args": ["run", "python", "main.py", "serve", "--transport", "stdio"],
+      "cwd": "/path/to/MCP_ops"
     }
   }
 }
 ```
 
-Restart Claude Desktop to load the server.
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    AI Agent (Gemini / Claude)            │
+│                         ↕ MCP (SSE/stdio)               │
+├─────────────────────────────────────────────────────────┤
+│                    src/mcp/server.py                     │
+│              7 MCP Tools + Model Cache                   │
+├──────────┬──────────┬───────────┬───────────────────────┤
+│ schemas/ │ models/  │ explain/  │ pipelines/            │
+│ Pydantic │ trainer  │ SHAP      │ training_pipeline     │
+│ models   │ registry │ explainer │ (4-stage orchestrator) │
+├──────────┴──────────┴───────────┴───────────────────────┤
+│   data/loader    data/validator    data/preprocessor     │
+│   features/engineer    config/settings    utils/logger   │
+├─────────────────────────────────────────────────────────┤
+│  MLflow (tracking/mlflow.db)  │  DVC (dvc.yaml)         │
+│  Experiment runs & artifacts  │  Reproducible pipeline   │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Data Flow
+
+1. **Ingest** — Load raw CSV → clean (fix types, fill NaN, dedup) → validate with Pydantic (sample) → save cleaned CSV
+2. **Feature Engineering** — Add 6 derived features (tenure_group, avg_charges_per_month, charges_ratio, num_services, has_internet, senior_high_charges)
+3. **Train** — Stratified 80/20 split → fit ColumnTransformer (StandardScaler + OneHotEncoder) → train 3 models → log to MLflow → select best by F1
+4. **Evaluate** — Load best model → compute SHAP global importance → save summary plot + evaluation JSON
+
+---
+
+## Project Structure
+
+```
+├── params.yaml                  # Centralized configuration (DVC params)
+├── dvc.yaml                     # DVC 4-stage pipeline definition
+├── main.py                      # CLI entry point (train / serve)
+├── pyproject.toml               # Dependencies and project config
+│
+├── src/
+│   ├── config/
+│   │   └── settings.py          # Load params.yaml, typed accessors
+│   ├── data/
+│   │   ├── loader.py            # Raw data ingestion & cleaning
+│   │   ├── validator.py         # Pydantic-based row validation
+│   │   └── preprocessor.py      # ColumnTransformer (scaler + encoder)
+│   ├── features/
+│   │   └── engineer.py          # 6 derived features (row-level, pre-split safe)
+│   ├── models/
+│   │   ├── trainer.py           # Model factory, training, MLflow logging
+│   │   └── registry.py          # Best model selection, leaderboard
+│   ├── explainability/
+│   │   └── shap_explainer.py    # SHAP TreeExplainer / LinearExplainer
+│   ├── pipelines/
+│   │   └── training_pipeline.py # 4-stage orchestrator + CLI
+│   ├── mcp/
+│   │   └── server.py            # 7 MCP tools + FastMCP server
+│   ├── schemas/
+│   │   └── models.py            # Pydantic models (9 schemas)
+│   └── utils/
+│       └── logger.py            # Structured logging setup
+│
+├── tests/
+│   ├── test_schemas.py          # Schema validation tests
+│   ├── test_model.py            # Model artifact + feature engineering tests
+│   └── test_mcp_tools.py        # MCP tool integration tests
+│
+├── data/
+│   ├── raw/churn.csv            # Original Telco Customer Churn dataset
+│   └── processed/               # Pipeline outputs (cleaned.csv, featured.csv, splits)
+│
+├── models/                      # Trained model artifacts
+│   ├── best_model.pkl           # Auto-selected best model
+│   ├── preprocessor.pkl         # Fitted ColumnTransformer
+│   ├── shap_background.pkl      # SHAP background data (100 samples)
+│   ├── training_metrics.json    # All model metrics
+│   ├── evaluation.json          # Best model evaluation
+│   └── plots/                   # Confusion matrices, ROC curves, SHAP summary
+│
+├── tracking/
+│   └── mlflow.db                # MLflow SQLite backend
+│
+└── mlruns/                      # MLflow artifact store
+```
+
+---
+
+## Technology Stack
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Runtime | Python 3.12 + uv | Fast dependency management, reproducible env |
+| ML Models | scikit-learn, XGBoost | Logistic Regression, Random Forest, XGBoost |
+| Explainability | SHAP | Per-prediction and global feature importance |
+| Agent Protocol | FastMCP | MCP server with SSE/stdio/streamable-http transport |
+| Experiment Tracking | MLflow | Params, metrics, artifacts, model registry |
+| Data Versioning | DVC | Reproducible pipeline stages, data tracking |
+| Validation | Pydantic | Type-safe schemas at every data boundary |
+| Testing | pytest | Schema, model artifact, and MCP integration tests |
+
+---
 
 ## Model Performance
 
-The Random Forest model achieves:
-- Accuracy: ~80%
-- Precision: ~75%
-- Recall: ~70%
-- F1 Score: ~72%
+Results from the latest training run on Telco Customer Churn (7,043 records, 26.5% churn rate):
 
-Metrics vary based on hyperparameter tuning and data preprocessing.
+| Model | F1 Score | AUC-ROC | Precision | Recall |
+|-------|----------|---------|-----------|--------|
+| Logistic Regression | 0.615 | 0.847 | — | — |
+| **Random Forest** (best) | **0.622** | **0.843** | **0.544** | **0.725** |
+| XGBoost | 0.611 | 0.830 | — | — |
 
-## Development
+Best model auto-selected by F1 score. All models handle class imbalance via balanced class weights.
 
-### Adding Dependencies
+---
 
-```bash
-uv add <package-name>
-```
+## DVC Pipeline
 
-### Running Linting
+Reproduce the full pipeline:
 
 ```bash
-uv run pylint src/
+# Run all stages
+dvc repro
+
+# Run a single stage
+dvc repro train
+
+# View pipeline DAG
+dvc dag
 ```
 
-## Data Versioning
+Pipeline stages and their dependencies are defined in `dvc.yaml`, parameterized by `params.yaml`.
 
-Dataset is tracked with DVC. To update:
+---
+
+## Viewing Experiments
+
+Launch the MLflow UI to inspect all training runs:
 
 ```bash
-uv run dvc add data/churn.csv
-uv run dvc push
+uv run mlflow ui --backend-store-uri sqlite:///tracking/mlflow.db
 ```
 
-## CI/CD
+Access at `http://localhost:5000`. Each run includes logged parameters, metrics, confusion matrix plots, ROC curves, and feature importance charts.
 
-GitHub Actions automatically:
-- Runs tests on push/PR
-- Validates code quality
-- Ensures reproducible builds
+---
 
 ## License
 
-MIT License
-
-## Author
-
-Built as a demonstration of modern MLOps practices.
+MIT

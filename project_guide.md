@@ -136,13 +136,3 @@ Once the agent finishes coding, you (the human) must add this to your config fil
 }
 
 ```
-
-### **Summary of "Why this works for your CV"**
-
-1. **"I used `uv`":** Shows you are on the bleeding edge of Python tooling (released 2024).
-2. 
-**"Local DVC/MLflow":** Shows you understand the *principles* of MLOps (versioning, tracking) even without an AWS bill.
-
-
-3. 
-**"CI/CD with GitHub Actions":** Shows you care about code quality.
